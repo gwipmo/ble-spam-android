@@ -21,13 +21,17 @@ import com.tutozz.blespam.databinding.ActivityMainBinding
 class MainActivity : ComponentActivity() {
     private lateinit var binding: ActivityMainBinding
 
+    // Helper function to handle the button click logic for all spammers
     private fun onClickSpamButton(spammer: Spammer, button: Button, circle: ImageView){
         button.setOnClickListener {
             if(!spammer.isSpamming){
                 spammer.start()
                 // blink animation
                 circle.setImageResource(R.drawable.active_circle)
-                if(spammer.blinkRunnable == null){ spammer.blinkRunnable = startBlinking(circle, spammer); }
+                if(spammer.blinkRunnable == null){ 
+                    // Note: blinkRunnable state management might be simplified, but we respect existing structure for now.
+                    spammer.blinkRunnable = startBlinking(circle, spammer); 
+                }
                 // button style
                 button.backgroundTintList = ContextCompat.getColorStateList(this, R.color.orange)
                 button.setTextColor(ContextCompat.getColor(this, R.color.white))
@@ -48,8 +52,7 @@ class MainActivity : ComponentActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         val view = binding.root
         setContentView(view)
-        // setup global blink animation
-
+        
         // Ask missing permissions
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions((this as Activity?)!!, arrayOf(Manifest.permission.BLUETOOTH), 1)
@@ -60,7 +63,13 @@ class MainActivity : ComponentActivity() {
         }
 
         if(Helper.isPermissionGranted(this)){
-            // Setup click listener
+            // Setup click listener for ALL SPAM METHODS
+
+            // NEW: All-In-One Dynamic Cycler Spam (Flooding + Evasion)
+            // NOTE: You must add a button with ID: allInOneButton and an ImageView with ID: allInOneCircle to your activity_main.xml layout file.
+            // Failure to do so will cause a runtime error (likely during view binding).
+            onClickSpamButton(BleCyclerSpam(), binding.allInOneButton, binding.allInOneCircle) 
+            
             // iOS 17 crash
             onClickSpamButton(ContinuitySpam(ContinuityDevice.type.ACTION, true), binding.ios17CrashButton, binding.ios17CrashCircle)
             // Apple Action Modal
@@ -119,4 +128,3 @@ class MainActivity : ComponentActivity() {
         return blinkRunnable
     }
 }
-

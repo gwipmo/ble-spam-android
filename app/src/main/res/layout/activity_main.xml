@@ -17,11 +17,52 @@
         tools:ignore="ImageContrastCheck"
         android:contentDescription="@string/blink_indicator" />
 
+    <!-- All-In-One Cycler Spam Section -->
+    <TextView
+        android:id="@+id/allInOneTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/logo"
+        android:text="ALL-IN-ONE CYCLER"
+        android:fontFamily="@font/notosans_medium"
+        android:textSize="11sp" />
+    <FrameLayout
+        android:id="@+id/allInOneButtonLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/allInOneTitle"
+        android:layout_marginBottom="10dp">
+
+        <Button
+            android:id="@+id/allInOneButton"
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:layout_marginEnd="5dp"
+            android:backgroundTint="@color/empty"
+            android:paddingStart="15dp"
+            android:paddingEnd="35dp"
+            android:text="Dynamic BLE Flood + Evasion"
+            android:fontFamily="@font/notosans_extrabold"
+            android:textColor="@color/black" />
+
+        <ImageView
+            android:id="@+id/allInOneCircle"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="26dp"
+            android:layout_marginEnd="20dp"
+            android:contentDescription="@string/blink_indicator"
+            android:elevation="10dp"
+            android:src="@drawable/grey_circle"
+            tools:ignore="ImageContrastCheck" />
+    </FrameLayout>
+
     <!-- Buttons -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/logo">
+        android:layout_below="@id/allInOneButtonLayout">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -38,22 +79,22 @@
                 android:textSize="11sp" />
             <!-- iOS 17 Crash Button -->
             <FrameLayout
-            android:id="@+id/ios17CrashButtonLayout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+                android:id="@+id/ios17CrashButtonLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="5dp">
 
-            <Button
-                android:id="@+id/ios17CrashButton"
-                android:layout_width="wrap_content"
-                android:layout_height="60dp"
-                android:layout_marginEnd="5dp"
-                android:backgroundTint="@color/empty"
-                android:paddingStart="15dp"
-                android:paddingEnd="35dp"
-                android:text="@string/ios_17_crash"
-                android:fontFamily="@font/notosans_extrabold"
-                android:textColor="@color/black" />
+                <Button
+                    android:id="@+id/ios17CrashButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="60dp"
+                    android:layout_marginEnd="5dp"
+                    android:backgroundTint="@color/empty"
+                    android:paddingStart="15dp"
+                    android:paddingEnd="35dp"
+                    android:text="@string/ios_17_crash"
+                    android:fontFamily="@font/notosans_extrabold"
+                    android:textColor="@color/black" />
 
                 <ImageView
                     android:id="@+id/ios17CrashCircle"
@@ -66,7 +107,7 @@
                     android:elevation="10dp"
                     android:src="@drawable/grey_circle"
                     tools:ignore="ImageContrastCheck" />
-        </FrameLayout>
+            </FrameLayout>
             <!-- Apple Action Modal Button -->
             <FrameLayout
                 android:id="@+id/appleActionModalButtonLayout"
@@ -241,7 +282,7 @@
                 android:text="@string/windows_title"
                 android:textSize="11sp" />
             <FrameLayout
-                android:id="@+id/windowsSwiftPairWatchButtonLayout"
+                android:id="@+id/windowsSwiftPairButtonLayout"
                 android:layout_width="wrap_content"
                 android:layout_marginBottom="5dp"
                 android:layout_height="wrap_content">
@@ -295,6 +336,7 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_alignParentBottom="true"
         android:layout_marginBottom="0dp">
 
         <LinearLayout
